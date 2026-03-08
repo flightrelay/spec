@@ -11,7 +11,7 @@ Flight Relay Protocol (FRP) defines a minimal open standard for **golf launch mo
 FRP is intentionally narrow in scope. It defines only:
 - The shot event lifecycle (trigger, ball flight, club data, face impact, completion)
 - Device telemetry (ready state, battery, tilt)
-- Detection mode commands (full, putting, chipping)
+- Detection mode commands (full, putting, chipping) with optional player handedness
 - Unit conventions for all physical measurements
 
 FRP defines no transport discovery, no authentication, no configuration, no actor system, and no REST API. Those concerns belong to the systems built on top of it.
@@ -389,13 +389,15 @@ Sets the shot detection mode on the device. The controller (simulator, automatio
 ```json
 {
   "kind": "set_detection_mode",
-  "mode": "chipping"
+  "mode": "chipping",
+  "handed": "rh"
 }
 ```
 
 - `mode` — `"full"` | `"putting"` | `"chipping"`
+- `handed` — optional, `"rh"` | `"lh"`. Player handedness. Some launch monitors use this to adjust tracking parameters (e.g. expected ball flight direction, camera positioning). Devices that do not use handedness must silently ignore the field.
 
-Detection mode is informational and for optimization only — it hints to the device what type of shot is expected so it can tune detection parameters. Devices that do not support a requested mode must silently ignore the command.
+Detection mode is informational and for optimization only — it hints to the device what type of shot is expected so it can tune detection parameters. Devices that do not support a requested mode or handedness must silently ignore the command.
 
 ---
 
@@ -497,7 +499,7 @@ A **compliant FRP device** (launch monitor or bridge) must:
 - Emit `shot_finished` to terminate every shot sequence
 - Use unit-tagged strings for all velocity and distance fields
 - Emit `device_telemetry` immediately after the handshake, and re-emit on changes
-- Accept `set_detection_mode` commands and silently ignore unsupported modes
+- Accept `set_detection_mode` commands and silently ignore unsupported modes and unrecognized fields (e.g. `handed`)
 - Ignore unknown `kind` values
 
 A compliant FRP device should:
