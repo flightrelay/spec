@@ -2,6 +2,8 @@
 
 **The open standard for golf launch monitor event streaming.**
 
+[Read the spec →](SPEC.md)
+
 ---
 
 ## The Problem
@@ -29,12 +31,14 @@ Implementing FRP does not mean opening your software stack, sharing your algorit
 Your firmware, your signal processing, your ball flight modeling, your proprietary app — none of that changes. FRP sits at the output layer: you emit shot events in a standard format over a local WebSocket. What happens inside your device to produce those events is entirely your own.
 
 **What you get:**
+
 - Immediate compatibility with every FRP-compliant open source project, with no ongoing SDK maintenance burden
 - No support obligation — the open source community consumes your events, not your codebase
 - No reverse engineering of your hardware — FRP gives the community a clean, supported integration path, which is always preferable to a fragile reverse-engineered one
 - A better ecosystem around your hardware, which makes your hardware more valuable
 
 **What you keep:**
+
 - Full control of your software stack
 - Full control of your proprietary app and cloud services
 - No obligation to document internals, maintain client libraries, or respond to SDK support requests
@@ -60,22 +64,24 @@ shot_trigger  →  ball_flight + club_path + face_impact (any order)  →  shot_
 Each shot is correlated by a `shot_id`. Controllers accumulate events until `shot_finished`, then process the composed shot. All velocity and distance values use unit-tagged strings (`"67.2mps"`, `"180.5m"`, `"197.4yd"`) — no implicit unit assumptions, no conversion bugs. Angles are decimal degrees, spin is RPM, time is seconds.
 
 ```javascript
-ws.send(JSON.stringify({ kind: "start", version: ["0.1.0"], name: "My Dashboard" }));
+ws.send(
+  JSON.stringify({ kind: "start", version: ["0.1.0"], name: "My Dashboard" }),
+);
 
 const shots = {};
 
 ws.onmessage = (msg) => {
   const message = JSON.parse(msg.data);
   const event = message.event;
-  if (!event || !event.key) return;  // handle device_info, alert separately
+  if (!event || !event.key) return; // handle device_info, alert separately
 
   const id = event.key.shot_id;
 
-  if (event.kind === "shot_trigger")  shots[id] = {};
-  if (event.kind === "ball_flight")   shots[id].ball = event.ball;
-  if (event.kind === "club_path")     shots[id].club = event.club;
-  if (event.kind === "face_impact")   shots[id].impact = event.impact;
-  if (event.kind === "shot_finished") process(shots[id]), delete shots[id];
+  if (event.kind === "shot_trigger") shots[id] = {};
+  if (event.kind === "ball_flight") shots[id].ball = event.ball;
+  if (event.kind === "club_path") shots[id].club = event.club;
+  if (event.kind === "face_impact") shots[id].impact = event.impact;
+  if (event.kind === "shot_finished") (process(shots[id]), delete shots[id]);
 };
 ```
 
@@ -114,9 +120,12 @@ FRP is in early draft. The spec is open for feedback.
 - [ ] Reference implementation (Rust, via Flighthook)
 - [ ] Conformance test suite
 
-[Read the spec →](SPEC.md)
+## SDKs
+
+| Language | Repository | Status |
+| -------- | ---------- | ------ |
+| Rust | [`flightrelay/sdk-rust`](https://github.com/flightrelay/sdk-rust) | Available |
 
 ## License
 
 The Flight Relay Protocol specification is [CC0](LICENSE) — no rights reserved. Implement it freely, in any product, open or closed, without attribution.
-
