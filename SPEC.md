@@ -394,10 +394,12 @@ Sets the shot detection mode on the device. The controller (simulator, automatio
 }
 ```
 
-- `mode` — `"full"` | `"putting"` | `"chipping"`
-- `handed` — optional, `"rh"` | `"lh"`. Player handedness. Some launch monitors use this to adjust tracking parameters (e.g. expected ball flight direction, camera positioning). Devices that do not use handedness must silently ignore the field.
+- `mode` — optional, `"full"` | `"putting"` | `"chipping"`. Shot detection mode.
+- `handed` — optional, `"rh"` | `"lh"`. Player handedness. Some launch monitors use this to adjust tracking parameters (e.g. expected ball flight direction, camera positioning).
 
-Detection mode is informational and for optimization only — it hints to the device what type of shot is expected so it can tune detection parameters. Devices that do not support a requested mode or handedness must silently ignore the command.
+Both fields are optional and may arrive in separate messages. A controller might send `handed` once at session start and `mode` on every hole. Devices must latch each field independently — the most recent value for each field is the active value. Omitting a field does not reset it.
+
+Detection mode and handedness are informational and for optimization only. Devices that do not support a requested mode or handedness must silently ignore the field.
 
 ---
 
@@ -499,7 +501,7 @@ A **compliant FRP device** (launch monitor or bridge) must:
 - Emit `shot_finished` to terminate every shot sequence
 - Use unit-tagged strings for all velocity and distance fields
 - Emit `device_telemetry` immediately after the handshake, and re-emit on changes
-- Accept `set_detection_mode` commands and silently ignore unsupported modes and unrecognized fields (e.g. `handed`)
+- Accept `set_detection_mode` commands, latch each field independently, and silently ignore unsupported fields
 - Ignore unknown `kind` values
 
 A compliant FRP device should:
