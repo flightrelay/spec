@@ -73,7 +73,7 @@ const shots = {};
 ws.onmessage = (msg) => {
   const message = JSON.parse(msg.data);
   const event = message.event;
-  if (!event || !event.key) return; // handle device_info, alert separately
+  if (!event || !event.key) return; // handle device_telemetry, alert separately
 
   const id = event.key.shot_id;
 

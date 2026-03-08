@@ -302,15 +302,15 @@ These events are not part of the shot lifecycle and do not carry a `key` field.
 
 ---
 
-### `device_info`
+### `device_telemetry`
 
-Device identification and telemetry. Emitted after the handshake completes and re-emitted whenever telemetry values change.
+Device identification and telemetry. Emitted immediately after the handshake completes, and re-emitted on changes.
 
 ```json
 {
   "device": "EagleOne-X4K2",
   "event": {
-    "kind": "device_info",
+    "kind": "device_telemetry",
     "manufacturer": "Birdie Labs",
     "model": "Eagle One",
     "firmware": "1.2.0",
@@ -496,7 +496,7 @@ A **compliant FRP device** (launch monitor or bridge) must:
 - Emit `shot_trigger` immediately on ball strike detection
 - Emit `shot_finished` to terminate every shot sequence
 - Use unit-tagged strings for all velocity and distance fields
-- Emit `device_info` at least once after the handshake, and re-emit whenever telemetry values change
+- Emit `device_telemetry` immediately after the handshake, and re-emit on changes
 - Accept `set_detection_mode` commands and silently ignore unsupported modes
 - Ignore unknown `kind` values
 
