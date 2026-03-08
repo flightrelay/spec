@@ -43,7 +43,7 @@ FRP defines two roles:
 
 Roles are **entity names, not directions**. Both sides send and receive messages — devices emit events and accept commands, controllers send commands and receive events. Roles are also independent of transport direction. In standalone FRP, the device is typically the WebSocket server and the controller connects to it. When FRP is embedded in another protocol (e.g. RRP's `golf.frp` extension), the transport direction may be reversed — the device may be the WebSocket client — but the roles do not change.
 
-**Recommended default port:** `5880` (WebSocket). Implementations should use this port unless the host system specifies otherwise.
+**Recommended default URL:** `ws://localhost:5880/frp`. Implementations should use this port and path unless the host system specifies otherwise. The `/frp` path ensures FRP is uniquely addressable on any WebSocket server without conflicting with other services.
 
 FRP does not define:
 - How the WebSocket connection is established
