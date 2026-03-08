@@ -117,7 +117,7 @@ Launch Monitor
 FRP is in early draft. The spec is open for feedback.
 
 - [x] Protocol spec draft
-- [ ] Reference implementation (Rust, via Flighthook)
+- [x] Reference implementation (Rust, via [Flighthook](https://github.com/divotmaker/flighthook))
 - [ ] Conformance test suite
 
 ## SDKs
