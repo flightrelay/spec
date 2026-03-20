@@ -195,7 +195,7 @@ Ball flight measurement data available. May arrive in any order relative to othe
 | `max_height` | unit-tagged string | Maximum apex height |
 | `flight_time` | float (seconds) | Time of flight (launch to landing) |
 | `backspin_rpm` | integer (RPM) | Backspin component. Positive = backspin, negative = topspin |
-| `sidespin_rpm` | integer (RPM) | Sidespin component. Positive = right (slice for RH) |
+| `sidespin_rpm` | integer (RPM) | Sidespin component. Positive = curves ball rightward (slice for RH, hook for LH) |
 
 ---
 
@@ -235,12 +235,12 @@ Club head measurement data available. May arrive in any order relative to other 
 |-------|------|-------------|
 | `club_speed` | unit-tagged string | Club head speed at impact |
 | `club_speed_post` | unit-tagged string | Club head speed after impact |
-| `path` | degrees (float) | Club path. Positive = in-to-out (draw for RH) |
+| `path` | degrees (float) | Club path relative to target line. Positive = rightward (in-to-out for RH, out-to-in for LH) |
 | `attack_angle` | degrees (float) | Attack angle. Positive = ascending (hit up) |
 | `face_angle` | degrees (float) | Face angle at impact. Positive = open (right of target) |
 | `dynamic_loft` | degrees (float) | Effective loft at impact |
 | `smash_factor` | float | Ball speed divided by club speed |
-| `swing_plane_horizontal` | degrees (float) | Horizontal swing plane rotation. Positive = in-to-out (draw for RH) |
+| `swing_plane_horizontal` | degrees (float) | Horizontal swing plane rotation. Positive = rightward (in-to-out for RH, out-to-in for LH) |
 | `swing_plane_vertical` | degrees (float) | Vertical swing plane angle relative to ground |
 | `club_offset` | unit-tagged string | Lateral position of club head at impact relative to ball center. Positive = toward toe side |
 | `club_height` | unit-tagged string | Vertical position of club head at impact relative to ball center. Positive = above center |
