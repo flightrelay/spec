@@ -41,9 +41,13 @@ FRP defines two roles:
 - **Device** — the FRP endpoint that emits shot data and accepts commands. A device may be a launch monitor, a bridge that aggregates multiple monitors, or any system that speaks the device side of FRP. The role is named "device" because the data always originates from a physical device — even when a bridge is in the middle, it represents the device to the controller. This aligns with the `"device"` field on every FRP event envelope.
 - **Controller** — the FRP endpoint that receives shot data and sends commands. A controller may be a golf simulator, a stat tracker, a video overlay, an automation layer, or any system that drives device behavior and processes shot events.
 
-Roles are **entity names, not directions**. Both sides send and receive messages — devices emit events and accept commands, controllers send commands and receive events. Roles are also independent of transport direction. In standalone FRP, the device is typically the WebSocket server and the controller connects to it. When FRP is embedded in another protocol (e.g. RRP's `golf.frp` extension), the transport direction may be reversed — the device may be the WebSocket client — but the roles do not change.
+Roles are **entity names, not directions**. Both sides send and receive messages — devices emit events and accept commands, controllers send commands and receive events. Roles are also independent of transport direction: either role may open the WebSocket connection or accept it, and all four combinations are valid FRP.
 
-**Recommended default URL:** `ws://localhost:5880/frp`. Implementations should use this port and path unless the host system specifies otherwise. The `/frp` path ensures FRP is uniquely addressable on any WebSocket server without conflicting with other services.
+Most commonly the device is the WebSocket server and the controller connects to it — a launch monitor serving a simulator on the local network. The reverse is equally valid: a device may open the connection to a controller that is listening. This suits a bridge reporting into a central bus, a device behind NAT that cannot accept inbound connections, or a monitor configured to report to a fixed endpoint. The transport direction is also reversed when FRP is embedded in another protocol (e.g. RRP's `golf.frp` extension).
+
+Whichever side opens the connection, the roles do not change: the controller sends `start`, the device answers `init`, the device emits event envelopes, and the controller sends commands.
+
+**Recommended default URL:** `ws://localhost:5880/frp`. Implementations should use this port and path unless the host system specifies otherwise. The `/frp` path ensures FRP is uniquely addressable on any WebSocket server without conflicting with other services. The port and path belong to whichever side listens, which is the device in the common case and the controller when the device opens the connection.
 
 FRP does not define:
 - How the WebSocket connection is established
@@ -84,6 +88,8 @@ FRP requires a minimal handshake before event streaming begins.
 - `version` — the FRP version selected by the device from the controller's proposed list
 
 After the `init` response, the device streams events.
+
+The controller sends `start` as soon as the WebSocket connection is established, without waiting to be prompted — including when the device opened the connection. The device does not signal readiness; a completed WebSocket handshake is the signal.
 
 Messages sent before the `start` handshake are ignored.
 
