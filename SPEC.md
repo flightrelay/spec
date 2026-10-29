@@ -273,7 +273,7 @@ Club head measurement data available. May arrive in any order relative to other 
 | `club_speed_post` | unit-tagged string | Club head speed after impact |
 | `path` | degrees (float) | Club path relative to target line. Positive = rightward (in-to-out for RH, out-to-in for LH) |
 | `attack_angle` | degrees (float) | Attack angle. Positive = ascending (hit up) |
-| `face_angle` | degrees (float) | Face angle at impact. Positive = open (right of target) |
+| `face_angle` | degrees (float) | Face angle at impact relative to the target line. Positive = rightward (open for RH, closed for LH) |
 | `dynamic_loft` | degrees (float) | Effective loft at impact |
 | `smash_factor` | float | Ball speed divided by club speed |
 | `swing_plane_horizontal` | degrees (float) | Horizontal swing plane rotation. Positive = rightward (in-to-out for RH, out-to-in for LH) |
@@ -490,7 +490,30 @@ Controllers must parse the suffix to interpret the value. Controllers must not a
 
 **Angles** are always decimal degrees (float). **Spin** is always RPM (integer). Neither is unit-tagged.
 
-**Lateral signs** are absolute, independent of player handedness: positive = right of the target line, as seen from behind the ball looking at the target. This applies to `launch_azimuth`, `carry_offline`, `total_offline`, `sidespin_rpm`, `spin_axis`, `path` and `swing_plane_horizontal`.
+---
+
+## Sign Conventions
+
+Every side-to-side field uses one of two frames. Neither depends on player handedness, so a device never flips a sign because the player is left-handed.
+
+| Frame | Positive | Fields |
+|-------|----------|--------|
+| **Target line** | Right of the target line, as seen from behind the ball looking at the target | `launch_azimuth`, `carry_offline`, `total_offline`, `sidespin_rpm`, `spin_axis`, `path`, `face_angle`, `swing_plane_horizontal` |
+| **Club face** | Toward the toe | `face_impact.lateral`, `club_offset` |
+
+Up-and-down fields are positive upward (`launch_elevation`, `attack_angle`, `face_impact.vertical`, `club_height`). `backspin_rpm` is positive for backspin. `low_point_distance` is positive on the target side of the ball.
+
+Words such as open/closed, in-to-out/out-to-in, draw/fade and hook/slice depend on handedness. They are for display only: controllers derive them from the signed value and the player's handedness, and FRP never carries them. A device or bridge whose hardware or upstream protocol reports these values relative to the golfer converts them to the frames above before sending.
+
+**Examples:**
+
+| Shot | Right-handed | Left-handed |
+|------|--------------|-------------|
+| Strike 8 mm toward the toe | `lateral` = `"8mm"` | `lateral` = `"8mm"` |
+| Face 2° open at impact | `face_angle` = `2.0` | `face_angle` = `-2.0` |
+| Path 3° in-to-out | `path` = `3.0` | `path` = `-3.0` |
+| Ball starts 1.5° left of target | `launch_azimuth` = `-1.5` | `launch_azimuth` = `-1.5` |
+| Ball curves left (hook for RH, slice for LH) | `sidespin_rpm` < 0 | `sidespin_rpm` < 0 |
 
 ---
 
