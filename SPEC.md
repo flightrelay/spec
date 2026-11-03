@@ -11,7 +11,7 @@ Flight Relay Protocol (FRP) defines a minimal open standard for **golf launch mo
 FRP is intentionally narrow in scope. It defines only:
 - The shot event lifecycle (trigger, ball flight, club data, face impact, completion)
 - Device telemetry (ready state, battery, tilt)
-- Detection mode commands (full, putting, chipping) with optional player handedness
+- Detection mode commands (full, putting, chipping) with optional player handedness and club in play
 - Unit conventions for all physical measurements
 
 FRP defines no transport discovery, no authentication, no configuration, no actor system, and no REST API. Those concerns belong to the systems built on top of it.
@@ -424,22 +424,45 @@ Controller-to-device messages sent after the handshake. These do not use the mes
 
 ### `set_detection_mode`
 
-Sets the shot detection mode on the device. The controller (simulator, automation layer) sends this to tell the device what type of shot is expected so it can tune its detection parameters accordingly. Radar launch monitors typically have distinct arming modes for full swings, chips, and putts, each optimized for different ball speeds and trajectories.
+Tells the device what to expect for the next shots: detection mode, player handedness and club in play. The controller (simulator, automation layer) sends this to tell the device what type of shot is expected so it can tune its detection parameters accordingly. Radar launch monitors typically have distinct arming modes for full swings, chips, and putts, each optimized for different ball speeds and trajectories.
 
 ```json
 {
   "kind": "set_detection_mode",
   "mode": "chipping",
-  "handed": "rh"
+  "handed": "rh",
+  "club": "SW"
 }
 ```
 
 - `mode` — optional, `"full"` | `"putting"` | `"chipping"`. Shot detection mode.
 - `handed` — optional, `"rh"` | `"lh"`. Player handedness. Some launch monitors use this to adjust tracking parameters (e.g. expected ball flight direction, camera positioning).
+- `club` — optional, a club code from the table below. The club the player is about to hit.
 
-Both fields are optional and may arrive in separate messages. A controller might send `handed` once at session start and `mode` on every hole. Devices must latch each field independently — the most recent value for each field is the active value. Omitting a field does not reset it.
+All fields are optional and may arrive in separate messages. A controller might send `handed` once at session start, `mode` on every hole and `club` on every shot. Devices must latch each field independently — the most recent value for each field is the active value. Omitting a field does not reset it. `club` does not set or imply `mode`: a controller that wants putting detection sends `"mode": "putting"`, with or without `"club": "PT"`. If a device uses both and they conflict, `mode` governs detection.
 
-Detection mode and handedness are informational and for optimization only. Devices that do not support a requested mode or handedness must silently ignore the field.
+`club` is a tracking hint, like `mode` and `handed`. Some launch monitors tune detection to the club in play: a unit may load a per-club profile before the shot, arm only when the club is a putter, or pass the club on to software that expects one. It describes the upcoming shot to the device; it is not a shot record, and devices do not echo it on shot events.
+
+**Club codes:**
+
+| Code | Club |
+|------|------|
+| `DR` | Driver |
+| `MD` | Mini driver |
+| `2W` – `9W` | Fairway wood, 2 to 9 |
+| `1H` – `9H` | Hybrid, 1 to 9 |
+| `1I` – `9I` | Iron, 1 to 9 |
+| `PW` | Pitching wedge |
+| `GW` | Gap wedge |
+| `SW` | Sand wedge |
+| `LW` | Lob wedge |
+| `PT` | Putter |
+
+Codes are case-sensitive. A controller whose club list is finer than this set sends the closest code; which code is closest is the controller's choice (e.g. a 54° wedge as `SW`, a 10-iron as `PW`).
+
+A device that receives a value it does not recognize for any of these fields — e.g. a `mode` other than the three above, a club code outside this table, or a value that is not a string — ignores that field: it keeps its latched value and still applies the other fields of the message. `null` is treated as the field being absent.
+
+Detection mode, handedness and club are informational and for optimization only. Devices that do not support a requested mode, handedness or club must silently ignore the field. A device that recognizes a club code but has no matching setting may apply the nearest club it supports, or ignore the field.
 
 ---
 
@@ -525,7 +548,7 @@ on timeout (no shot_finished within N seconds):
 ## Robustness
 
 - Unknown `kind` values must be silently ignored
-- Unknown fields on known events must be silently ignored
+- Unknown fields on known messages (events and commands) must be silently ignored
 - Missing optional fields must be handled gracefully
 - Invalid JSON must be silently ignored
 - Controllers must not crash on partial shots (e.g. `ball_flight` with no `club_path` or `face_impact`)
@@ -536,7 +559,7 @@ on timeout (no shot_finished within N seconds):
 
 ## Versioning
 
-The protocol version follows **semver**. Breaking changes increment the major version. Adding an optional field to an existing event is not a breaking change: peers ignore unknown fields and handle missing optional fields (see Robustness). The controller proposes supported versions in `start` (`version` array). The device selects the highest mutually supported version and confirms it in `init` (`version` string). If no version is compatible, the device sends a `critical` alert and closes the connection.
+The protocol version follows **semver**. Breaking changes increment the major version. Adding an optional field to an existing event or command is not a breaking change: peers ignore unknown fields and handle missing optional fields (see Robustness). The controller proposes supported versions in `start` (`version` array). The device selects the highest mutually supported version and confirms it in `init` (`version` string). If no version is compatible, the device sends a `critical` alert and closes the connection.
 
 Version strings in the handshake are plain semver (e.g. `"0.1.0"`). They carry no draft, release-candidate, or status suffix — the maturity of a given version is out-of-band knowledge between implementations.
 

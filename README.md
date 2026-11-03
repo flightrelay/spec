@@ -51,7 +51,7 @@ Implement FRP once. Support every compliant launch monitor forever.
 
 No reverse engineering. No fragile unofficial integrations. No per-device maintenance burden. When a new launch monitor ships FRP support, it works with your project on day one.
 
-FRP is intentionally narrow — it defines the shot events and device telemetry that flow from the launch monitor, plus a small set of commands back (detection mode). It does not define transport discovery, authentication, configuration, or device management. Those concerns belong to your project. FRP is easy to embed in whatever architecture you already have.
+FRP is intentionally narrow — it defines the shot events and device telemetry that flow from the launch monitor, plus a small set of commands back (detection mode, with optional handedness and club hints). It does not define transport discovery, authentication, configuration, or device management. Those concerns belong to your project. FRP is easy to embed in whatever architecture you already have.
 
 ## How It Works
 
