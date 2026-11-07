@@ -22,7 +22,7 @@ The result is that the open source golf sim ecosystem — which should be the mo
 
 Flight Relay Protocol (FRP) is a minimal open standard for streaming launch monitor shot data over WebSocket.
 
-It defines the events that matter — shot trigger, ball flight, club path, face impact, shot finished, device telemetry, alerts, and detection mode commands. Any launch monitor vendor can implement a small FRP device alongside their existing software stack in a weekend. Any open source simulator, stat tracker, video overlay, or analysis tool can implement an FRP controller once and work with every compliant device immediately.
+It defines the events that matter — shot trigger, launch, flight result, club path, face impact, shot finished, device telemetry, alerts, and detection mode commands — plus optional raw frames for debugging. Any launch monitor vendor can implement a small FRP device alongside their existing software stack in a weekend. Any open source simulator, stat tracker, video overlay, or analysis tool can implement an FRP controller once and work with every compliant device immediately.
 
 ## For Launch Monitor Vendors
 
@@ -58,17 +58,24 @@ FRP is intentionally narrow — it defines the shot events and device telemetry 
 FRP is a WebSocket protocol. After a brief handshake, the device streams JSON events for every shot lifecycle stage:
 
 ```
-shot_trigger  →  ball_flight + club_path + face_impact (any order)  →  shot_finished
+shot_trigger  →  launch + flight_result + club_path + face_impact (any order)  →  shot_finished
 ```
 
-Each shot is correlated by a `shot_id`. Controllers accumulate events until `shot_finished`, then process the composed shot. All velocity and distance values use unit-tagged strings (`"67.2mps"`, `"180.5m"`, `"197.4yd"`) — no implicit unit assumptions, no conversion bugs. Angles are decimal degrees, spin is RPM, time is seconds.
+Each shot is correlated by a `shot_id`, and `shot_trigger` can carry the time of the strike. Controllers accumulate events until `shot_finished`, then process the composed shot. A shot that doesn't finish within the accumulator timeout (30 seconds recommended) is discarded. All velocity and distance values use unit-tagged strings (`"67.2mps"`, `"180.5m"`, `"197.4yd"`) — no implicit unit assumptions, no conversion bugs. Angles are decimal degrees, spin is RPM, time is seconds.
 
 ```javascript
 ws.send(
-  JSON.stringify({ kind: "start", version: ["0.1.0"], name: "My Dashboard" }),
+  JSON.stringify({ kind: "start", version: ["0.2.0"], name: "My Dashboard" }),
 );
 
 const shots = {};
+
+// Launch values for flying the ball yourself: each measured value, with a
+// missing one filled from what a modeled flight result assumed.
+const launchForFlight = (shot) => ({
+  ...(shot.flight?.basis === "modeled" ? shot.flight.assumed : {}),
+  ...shot.launch,
+});
 
 ws.onmessage = (msg) => {
   const message = JSON.parse(msg.data);
@@ -77,10 +84,12 @@ ws.onmessage = (msg) => {
 
   const id = event.key.shot_id;
 
-  if (event.kind === "shot_trigger") shots[id] = {};
-  if (event.kind === "ball_flight") shots[id].ball = event.ball;
-  if (event.kind === "club_path") shots[id].club = event.club;
-  if (event.kind === "face_impact") shots[id].impact = event.impact;
+  // A shot keeps the first event of each kind.
+  if (event.kind === "shot_trigger") shots[id] ??= {};
+  if (event.kind === "launch") shots[id].launch ??= event.launch;
+  if (event.kind === "flight_result") shots[id].flight ??= event.flight; // also check basis is "tracked" or "modeled"
+  if (event.kind === "club_path") shots[id].club ??= event.club;
+  if (event.kind === "face_impact") shots[id].impact ??= event.impact;
   if (event.kind === "shot_finished") (process(shots[id]), delete shots[id]);
 };
 ```
@@ -89,11 +98,25 @@ That's the core of an FRP controller. The full spec is one markdown file.
 
 ## Why Multiple Events Per Shot?
 
-Launch monitors don't produce all their data at once. Ball flight data (speed, angles, spin) is typically available within milliseconds of impact from radar processing. Club data may take longer — some devices use separate sensors or processing pipelines. Face impact location, when available, requires fusing radar and camera data with significant post-processing delay.
+Launch monitors don't produce all their data at once. Ball launch data (speed, angles, spin) is typically available within milliseconds of impact from radar processing, while carry and the rest of the flight result may come seconds later from tracking the ball or from a flight model. Club data may take longer — some devices use separate sensors or processing pipelines. Face impact location, when available, requires fusing radar and camera data with significant post-processing delay.
 
-FRP splits the shot into separate events so devices can emit each measurement **as soon as it's ready**, rather than blocking on the slowest pipeline. A simulator can start animating the ball flight immediately on `ball_flight`, then incorporate club and face impact data when they arrive. `shot_finished` signals that all available data for the shot has been sent.
+FRP splits the shot into separate events so devices can emit each measurement **as soon as it's ready**, rather than blocking on the slowest pipeline. A simulator can start animating the ball flight immediately on `launch`, then incorporate club and face impact data when they arrive. `shot_finished` signals that all available data for the shot has been sent.
 
 This design means controllers never wait longer than necessary, and devices never need to buffer data they already have.
+
+## Measured or Modeled?
+
+FRP keeps what a launch monitor measured apart from what a flight model produced. `launch` carries the launch only (ball speed, launch angles and spin), and everything in it is measured. Carry, total distance, apex and the rest of the flight go in `flight_result`, whose required `basis` says whether the device tracked the ball's flight (`tracked`) or a flight model produced the values (`modeled`). When the launch lacks a value the model needed, such as the spin of a chip the device couldn't read, a `modeled` result lists what the model assumed in `assumed`; it never appears in `launch`. A device never sends a placeholder for a value it doesn't have. `device_telemetry` declares the device's `source`: `measured` (a physical launch monitor measured the shots) or `virtual` (simulated or generated shots). Relaying a shot never changes its source.
+
+A controller that needs measured data only, such as one recording a tournament round, drops shots whose source isn't `measured` and ignores `flight_result`, assumed values included, then flies the ball with its own model. Everyone else can use both.
+
+## Bridges and Forwarding
+
+A bridge or hub that forwards events keeps each shot's `device`, `shot_id`, `shot_number` and `timestamp` unchanged, so a controller can recognize the same shot arriving by two routes. A forwarder may add a `flight_result` from its own model to a shot whose device sent none, marked `modeled`, naming the model and listing any launch values it assumed. Every endpoint that forwards events drops duplicates first: a shot event already forwarded, telemetry that changes nothing, an alert already sent, a raw frame whose sequence number it has seen. A repeat stops at the first hop, so an event that loops back dies out. How forwarders form a bus and find each other is outside the spec.
+
+## Raw Frames for Debugging
+
+A device that translates another protocol into FRP can also show what it saw. A controller that sends `"raw_frames": true` in `start` gets a `raw_frame` event for each protocol message the device received (`rx`) or sent (`tx`): the message as hex, a per-device sequence number, an optional timestamp and label, and the shot it belongs to when the device knows it. Raw frames are off unless asked for, never carry device or user identity such as serial numbers or network names, and never affect a shot. FRP treats their content as opaque.
 
 ## Ecosystem
 
@@ -114,7 +137,7 @@ Launch Monitor
 
 ## Status
 
-FRP is in early draft. The spec is open for feedback.
+FRP is in early draft. The spec is open for feedback. The current version is 0.2.0, a breaking revision of 0.1.0: `ball_flight` is replaced by `launch`, which carries launch values only, and flight results moved to the new `flight_result`.
 
 - [x] Protocol spec draft
 - [x] Reference implementation (Rust, via [Flighthook](https://github.com/divotmaker/flighthook))
