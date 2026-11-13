@@ -461,7 +461,8 @@ shot.finished
 ```
 
 `shot.launch`, `shot.club`, `shot.impact` and `shot.flight` may arrive in any order. Any of them may not arrive at all
-(hardware-dependent). `shot.finished` is the launch monitor's last message for the shot. A launch monitor sends each of its
+(hardware-dependent). `shot.finished` is the launch monitor's last message for the shot; another actor's addendum,
+such as a flight model's `shot.flight`, may follow it (see `shot.finished`). A launch monitor sends each of its
 lifecycle messages once per shot, with all the data it has for that part of the shot.
 
 A shot is identified by `key.shot_id` alone, so a collector accumulates by `shot_id`, whoever sent each part. All
@@ -703,7 +704,8 @@ landing of a ball in flight; senders omit them for a ball that does not leave th
 
 **Several per shot.** Any actor may publish a `shot.flight` for any shot it saw launched; flights are told apart by
 `from` and `flight.model`. A launch monitor sends at most one of its own. A collector keeps every flight it receives;
-which one it shows is its choice (e.g. prefer `tracked`). Flight models send as soon as they can.
+which one it shows is its choice (e.g. prefer `tracked`). Flight models send as soon as they can, also after the
+shot's `shot.finished` (see `shot.finished`).
 
 **Basis.** Every `shot.flight` says how its values were obtained:
 
@@ -790,9 +792,10 @@ emit the accumulated shot.
 }
 ```
 
-A message for a shot that arrives after its `shot.finished` (e.g. a flight model's `shot.flight`): a collector that
-has already composed the shot updates it with the late message (its own choice how to show the update) and logs a
-warning.
+`shot.finished` ends only its sender's messages for the shot. An actor that sends a lifecycle message for a shot
+after its own `shot.finished` for that shot is out of order, and a collector logs a warning. Any other actor that adds
+to the shot (e.g. a flight model's `shot.flight`) may publish its addendum at any time, before or after the
+`shot.finished`, keyed by the shot's `key`. How a collector correlates and shows an addendum is its choice.
 
 ---
 
@@ -875,8 +878,8 @@ on accumulator timeout (no shot.finished within T of shot.trigger):
     mark shot_id closed
 
 on shot.launch / shot.club / shot.impact / shot.flight for a finished shot_id:
-    if the collector still remembers the shot: update the composed shot with it (as above), log a warning
-    otherwise: ignore
+    if it comes from the actor that sent the shot.finished: log a warning
+    correlate it with the composed shot as the collector chooses (e.g. update the shot as above)
 
 on any other lifecycle message for a closed or finished shot_id:
     ignore
@@ -1396,7 +1399,8 @@ A compliant launch monitor should:
 - Declare `source` in its `bus.actor` `device` when it knows the origin of its shots
 
 **A compliant flight model** must send `shot.flight` with `basis` `modeled`, and `assumed` only for launch fields the
-shot's `launch` does not carry. It should name its model in `model` and send as soon as it can.
+shot's `launch` does not carry. It should name its model in `model` and send as soon as it can, before or after the
+shot's `shot.finished`.
 
 **A compliant collector** must:
 - Implement the ShotAccumulator pattern, including the accumulator timeout: discard a shot whose `shot.finished` does
@@ -1406,7 +1410,8 @@ shot's `launch` does not carry. It should name its model in `model` and send as 
 - Ignore a `shot.flight` whose `basis` is missing or unrecognized
 - Ignore `assumed` in a `tracked` flight, and use the `launch` value of a field that is in both `launch` and `assumed`
 - Ignore a `timestamp` that is not a non-negative integer, and still process the trigger
-- Log a warning when it updates a composed shot with a message that arrives after its shot's `shot.finished`
+- Log a warning when an actor sends a lifecycle message for a shot after its own `shot.finished` for that shot, and
+  not for another actor's addendum
 - If it requires measured shots, treat a launch monitor whose `source` is absent or unrecognized as not measured, and
   ignore `shot.flight`
 - Keep `shot.raw` out of the ShotAccumulator: raw frames never create, complete or change a shot
@@ -1442,7 +1447,8 @@ do not interoperate.
 - **`set_detection_mode`** is replaced by `golfer.turn` (owned by the session) and `golfer.select`. `handed` is
   `handedness`. Every `golfer.turn` is complete and a receiver never merges it with an earlier one: a null `club` is
   no club, and a null or unknown value in any field is no hint for that field.
-- **`shot.flight`**: several per shot, from any flight model. A hub no longer adds or deduplicates flights.
+- **`shot.flight`**: several per shot, from any flight model, which may send it after the shot's `shot.finished`. A
+  hub no longer adds or deduplicates flights.
 - **Raw frames** are turned on by the sending actor's own configuration.
 - **Forwarding** duplicate detection is removed; hubs forward every message, and loops are a configuration error.
 - **New kinds:** `bus.sync`, `bus.reply`, `golfer.profile`, `golfer.turn`, `golfer.select`, `practice.block`,
