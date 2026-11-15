@@ -333,6 +333,11 @@ changed.
 | `battery_pct` | integer | Optional. 0–100 |
 | `tilt`, `roll` | degrees (float) | Optional. Device attitude |
 
+**`telemetry`** is display text, so the rule for measured values (see Placeholders are omitted) does not apply to
+it. An actor sends every telemetry key it uses in every `bus.actor`, from its first one on, with a value even when it
+has nothing to report (e.g. `"none"`, `"unknown"`, `"idle"`). It never leaves a key out of one message and sends it in
+another. A receiver can then show an actor's telemetry as it arrives, without knowing the actor's keys in advance.
+
 ```json
 {
   "kind": "bus.actor",
