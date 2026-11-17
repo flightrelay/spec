@@ -322,6 +322,7 @@ changed.
 | `blockers` | array of string | Required, empty when the actor sees no reason a shot shouldn't be taken now. See Blockers |
 | `device` | object | Optional. For launch monitors, below |
 | `telemetry` | object | Optional. Free key/value pairs, string values, for display only |
+| `flagged` | array of string | Optional. Values that need the user's attention now. See below |
 | `removed` | `true` | Sent once when the actor stops cleanly |
 
 **`device`:**
@@ -331,7 +332,16 @@ changed.
 | `manufacturer`, `model`, `firmware` | string | Optional |
 | `source` | string | Optional. `"measured"` or `"virtual"`: where this actor's shots originate (see `source`) |
 | `battery_pct` | integer | Optional. 0–100 |
-| `tilt`, `roll` | degrees (float) | Optional. Device attitude |
+
+**`telemetry`** is display text, so the rule for measured values (see Placeholders are omitted) does not apply to
+it. An actor sends every telemetry key it uses in every `bus.actor`, from its first one on, with a value even when it
+has nothing to report (e.g. `"none"`, `"unknown"`, `"idle"`). It never leaves a key out of one message and sends it in
+another. A receiver can then show an actor's telemetry as it arrives, without knowing the actor's keys in advance.
+
+**`flagged`** names the values that need the user's attention now, such as a device's attitude when it is not level:
+telemetry keys, and `battery_pct`. The actor decides what is out of range, since only it knows its own limits. Like
+`blockers` it is replaced whole, and an absent or empty list means nothing is flagged. A receiver may highlight a
+flagged value; like telemetry, it is display only.
 
 ```json
 {
@@ -347,10 +357,10 @@ changed.
     "model": "Eagle One",
     "firmware": "2.4.1",
     "source": "measured",
-    "battery_pct": 82,
-    "tilt": 0.4,
-    "roll": -0.2
-  }
+    "battery_pct": 82
+  },
+  "telemetry": { "mode": "outdoor", "tilt": "6.5°", "roll": "-0.2°" },
+  "flagged": ["tilt"]
 }
 ```
 
